@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Iniciação Científica</title>
+
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+
+  <style>
+    :root {
+      --primary: #7c3aed;
+      --primary-hover: #6d28d9;
+      --primary-light: #f5f3ff;
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --danger: #dc2626;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,.05), 0 2px 4px -1px rgba(0,0,0,.03);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    body { background: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; }
+
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem; display: flex; justify-content: space-between;
+      align-items: center; flex-wrap: wrap; gap: 1rem; position: sticky; top: 0; z-index: 100;
+    }
+    .brand { display: flex; align-items: center; gap: .75rem; }
+    .brand-icon {
+      background: var(--primary-light); color: var(--primary); width: 40px; height: 40px;
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 1.2rem;
+    }
+    .sync-bar {
+      display: flex; align-items: center; gap: .6rem; background: var(--primary-light);
+      padding: .4rem .8rem; border-radius: var(--radius); border: 1px solid rgba(124,58,237,.2);
+      flex-wrap: wrap;
+    }
+    .sync-status { font-size: .8rem; font-weight: 600; color: var(--primary); }
+    .user-name { font-size: .8rem; color: var(--text-muted); }
+
+    .app-container { display: flex; flex: 1; overflow: hidden; }
+    nav {
+      width: 240px; background: var(--surface); border-right: 1px solid var(--border);
+      padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: .5rem;
+    }
+    .nav-btn {
+      display: flex; align-items: center; gap: .75rem; padding: .75rem 1rem; border: none;
+      background: transparent; color: var(--text-muted); border-radius: var(--radius);
+      cursor: pointer; font-weight: 500; text-align: left; width: 100%; transition: all .2s;
+    }
+    .nav-btn:hover { background: var(--primary-light); color: var(--primary); }
+    .nav-btn.active { background: var(--primary); color: white; }
+
+    main { flex: 1; padding: 2rem; overflow-y: auto; max-width: 1200px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow);
+    }
+    h2 { margin-bottom: 1rem; font-size: 1.4rem; }
+
+    .progress-bar-container { background: #e2e8f0; height: 20px; border-radius: 10px; overflow: hidden; margin: 1rem 0; }
+    .progress-bar { background: var(--primary); height: 100%; width: 0%; transition: width .4s ease; }
+
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; margin-bottom: .4rem; font-size: .9rem; font-weight: 600; color: var(--text-muted); }
+    input, textarea, select {
+      width: 100%; padding: .6rem .8rem; border: 1px solid var(--border);
+      border-radius: 8px; font-size: .95rem; outline: none;
+    }
+    input:focus, textarea:focus { border-color: var(--primary); }
+    input[type="checkbox"] { width: auto; }
+
+    .btn {
+      background: var(--primary); color: white; border: none; padding: .6rem 1.2rem;
+      border-radius: 8px; cursor: pointer; font-weight: 600; transition: background .2s;
+      text-decoration: none; display: inline-block; font-size: .9rem;
+    }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-secondary { background: var(--primary-light); color: var(--primary); }
+    .btn-secondary:hover { background: #ede9fe; }
+    .btn-danger { background: #fef2f2; color: var(--danger); }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-sm { padding: .3rem .7rem; font-size: .8rem; }
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+    .item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+    .item-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1rem; display: flex; flex-direction: column; justify-content: space-between; gap: .75rem;
+    }
+    .item-card h3 { font-size: 1.1rem; margin-bottom: .5rem; }
+    .item-card p { font-size: .9rem; color: var(--text-muted); margin-bottom: .5rem; }
+
+    .modal {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+      z-index: 1000; align-items: center; justify-content: center; padding: 2rem;
+    }
+    .modal-content {
+      background: white; width: 90%; height: 90%; border-radius: var(--radius);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+      padding: 1rem; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    }
+    .modal-body { flex: 1; }
+    iframe { width: 100%; height: 100%; border: none; }
+
+    .editor-layout { display: grid; grid-template-columns: 1fr 300px; gap: 1.5rem; }
+    @media (max-width: 900px) {
+      .editor-layout { grid-template-columns: 1fr; }
+      .app-container { flex-direction: column; }
+      nav { width: 100%; border-right: none; border-bottom: 1px solid var(--border); flex-direction: row; overflow-x: auto; }
+      .nav-btn { white-space: nowrap; width: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">IC</div>
+      <div>
+        <h1 style="font-size:1.2rem;">Gestão de Iniciação Científica</h1>
+        <p style="font-size:.8rem;color:var(--text-muted);">Painel do Pesquisador</p>
+      </div>
+    </div>
+
+    <div class="sync-bar">
+      <span class="user-name" id="user-name"></span>
+      <button class="btn btn-sm" id="btn-login" onclick="loginGoogle()">Entrar com Google</button>
+      <button class="btn btn-secondary btn-sm" id="btn-logout" onclick="logout()" style="display:none;">Sair</button>
+      <div class="sync-status" id="sync-status">Iniciando...</div>
+    </div>
+  </header>
+
+  <div class="app-container">
+    <nav>
+      <button class="nav-btn active" data-tab="dashboard">📊 Progresso & Visão Geral</button>
+      <button class="nav-btn" data-tab="articles">📚 Artigos e PDFs</button>
+      <button class="nav-btn" data-tab="quotes">💬 Banco de Citações</button>
+      <button class="nav-btn" data-tab="timeline">📅 Cronograma</button>
+      <button class="nav-btn" data-tab="writer">✍️ Redação & Sinônimos</button>
+    </nav>
+
+    <main>
+      <!-- DASHBOARD -->
+      <section id="tab-dashboard" class="tab-content active">
+        <div class="card">
+          <h2>Progresso Geral da IC</h2>
+          <p style="color:var(--text-muted);">Baseado nas tarefas concluídas do cronograma.</p>
+          <div class="progress-bar-container"><div class="progress-bar" id="overall-progress"></div></div>
+          <p id="progress-percentage-text" style="font-weight:bold;text-align:right;color:var(--primary);">0% Concluído</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;">
+          <div class="card"><h3>Artigos Cadastrados</h3>
+            <p id="total-articles-count" style="font-size:2rem;font-weight:bold;color:var(--primary);margin-top:.5rem;">0</p></div>
+          <div class="card"><h3>Citações Fichadas</h3>
+            <p id="total-quotes-count" style="font-size:2rem;font-weight:bold;color:var(--primary);margin-top:.5rem;">0</p></div>
+          <div class="card"><h3>Tarefas Concluídas</h3>
+            <p id="completed-tasks-count" style="font-size:2rem;font-weight:bold;color:var(--primary);margin-top:.5rem;">0</p></div>
+        </div>
+      </section>
+
+      <!-- ARTIGOS -->
+      <section id="tab-articles" class="tab-content">
+        <div class="card">
+          <h2>Cadastrar Novo Artigo</h2>
+          <form id="form-article" onsubmit="saveArticle(event)">
+            <div class="form-group"><label>Título do Artigo</label><input type="text" id="art-title" required></div>
+            <div class="form-group"><label>Autores & Ano</label><input type="text" id="art-authors" placeholder="Ex: SILVA, A. M. (2025)" required></div>
+            <div class="form-group"><label>Resumo / Fichamento</label><textarea id="art-summary" rows="3"></textarea></div>
+            <div class="form-group">
+              <label>Link do PDF (Google Drive, site do periódico...)</label>
+              <input type="url" id="art-link" placeholder="https://drive.google.com/file/d/.../view">
+              <p style="font-size:.8rem;color:var(--text-muted);margin-top:.3rem;">No Drive, compartilhe como "Qualquer pessoa com o link" para abrir aqui dentro.</p>
+            </div>
+            <button type="submit" class="btn">Salvar Artigo</button>
+          </form>
+        </div>
+        <h2>Artigos Cadastrados</h2>
+        <div class="item-grid" id="articles-list"></div>
+      </section>
+
+      <!-- CITAÇÕES -->
+      <section id="tab-quotes" class="tab-content">
+        <div class="card">
+          <h2>Adicionar Citação</h2>
+          <form id="form-quote" onsubmit="saveQuote(event)">
+            <div class="form-group"><label>Trecho da Citação</label><textarea id="quote-text" rows="3" required placeholder="Cole o trecho exato aqui..."></textarea></div>
+            <div class="form-group"><label>Referência / Origem</label><input type="text" id="quote-ref" placeholder="Ex: SILVA (2025, p. 45)" required></div>
+            <div class="form-group"><label>Tags / Tema</label><input type="text" id="quote-tags" placeholder="Ex: Metodologia, Resultados"></div>
+            <button type="submit" class="btn">Salvar Citação</button>
+          </form>
+        </div>
+        <h2>Banco de Citações</h2>
+        <div class="item-grid" id="quotes-list"></div>
+      </section>
+
+      <!-- CRONOGRAMA -->
+      <section id="tab-timeline" class="tab-content">
+        <div class="card">
+          <h2>Nova Tarefa do Cronograma</h2>
+          <form id="form-task" onsubmit="saveTask(event)">
+            <div class="form-group"><label>Descrição da Tarefa</label><input type="text" id="task-desc" required></div>
+            <div class="form-group"><label>Prazo / Mês</label><input type="text" id="task-deadline" placeholder="Ex: Março/2026" required></div>
+            <button type="submit" class="btn">Adicionar Tarefa</button>
+          </form>
+        </div>
+        <h2>Lista de Atividades</h2>
+        <div id="tasks-list"></div>
+      </section>
+
+      <!-- REDAÇÃO -->
+      <section id="tab-writer" class="tab-content">
+        <div class="editor-layout">
+          <div class="card">
+            <h2>Editor de Texto da IC</h2>
+            <textarea id="writer-content" rows="20" placeholder="Escreva seu trabalho aqui..." oninput="scheduleDraftSave()"></textarea>
+            <p id="draft-status" style="font-size:.8rem;color:var(--text-muted);margin-top:.5rem;">Salva automaticamente.</p>
+          </div>
+          <div class="card">
+            <h3>Dicionário de Sinônimos Acadêmicos</h3>
+            <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.5rem;">Busque conectivos e alternativas formais.</p>
+            <input type="text" id="synonym-search" placeholder="Digite uma palavra..." onkeyup="searchSynonyms()">
+            <div id="synonym-results" style="margin-top:1rem;font-size:.9rem;"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal PDF -->
+  <div class="modal" id="pdf-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="pdf-modal-title">Visualizador de PDF</h3>
+        <div class="actions">
+          <a class="btn btn-secondary" id="pdf-open-tab" target="_blank" rel="noopener">Abrir em nova aba</a>
+          <button class="btn btn-secondary" onclick="closePdfModal()">Fechar</button>
+        </div>
+      </div>
+      <div class="modal-body"><iframe id="pdf-frame"></iframe></div>
+    </div>
+  </div>
+
+  <script>
+    // =====================================================
+    // 1) COLE AQUI O SEU firebaseConfig REAL
+    //    Console Firebase → Configurações do projeto → Seus apps → App da Web
+    // =====================================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAAf_HYFLTNu9c8-4gNXYpxdiGL39cSG-Q",
+      authDomain: "ic-alanis.firebaseapp.com",
+      projectId: "ic-alanis",
+      storageBucket: "ic-alanis.firebasestorage.app",
+      messagingSenderId: "179324651768",
+      appId: "1:179324651768:web:4d41e8e29976a400d5130d"
+    };
+
+    const FIREBASE_OK = firebaseConfig.apiKey !== "COLE_AQUI";
+    let db = null, auth = null;
+    if (FIREBASE_OK) {
+      if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      auth = firebase.auth();
+    }
+
+    const LOCAL_KEY = 'ic_local_backup';
+    const emptyState = () => ({ articles: [], quotes: [], tasks: [], draft: '' });
+    let state = emptyState();
+    let currentUser = null;
+    let unsubscribe = null;
+    let draftTimer = null;
+
+    // ---------- util ----------
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function setStatus(t) { document.getElementById('sync-status').innerText = t; }
+
+    // ---------- abas ----------
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+        btn.classList.add('active');
+      });
+    });
+
+    // ---------- armazenamento ----------
+    function loadLocal() {
+      try {
+        const raw = localStorage.getItem(LOCAL_KEY);
+        if (raw) state = { ...emptyState(), ...JSON.parse(raw) };
+      } catch (e) { console.warn('Backup local inválido', e); }
+    }
+
+    function persist() {
+      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); } catch (e) {}
+      if (currentUser && db) {
+        setStatus('Salvando... ☁️');
+        db.collection('projects').doc(currentUser.uid).set(state)
+          .then(() => setStatus('Sincronizado ☁️'))
+          .catch(err => { console.error(err); setStatus('Erro ao salvar (salvo só neste aparelho) 💾'); });
+      }
+    }
+
+    // ---------- login ----------
+    function loginGoogle() {
+      if (!FIREBASE_OK) { alert('Cole primeiro o firebaseConfig real no código.'); return; }
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(err => {
+        console.error(err);
+        alert('Não foi possível entrar: ' + err.message);
+      });
+    }
+    function logout() { if (auth) auth.signOut(); }
+
+    function startAuth() {
+      loadLocal();
+      renderAll();
+
+      if (!FIREBASE_OK) {
+        setStatus('Modo Local 💾 (Firebase não configurado)');
+        return;
+      }
+
+      auth.onAuthStateChanged(user => {
+        if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+        currentUser = user;
+
+        document.getElementById('btn-login').style.display = user ? 'none' : '';
+        document.getElementById('btn-logout').style.display = user ? '' : 'none';
+        document.getElementById('user-name').innerText = user ? (user.displayName || user.email) : '';
+
+        if (!user) { setStatus('Faça login para sincronizar 🔒'); return; }
+
+        setStatus('Conectando... ☁️');
+        unsubscribe = db.collection('projects').doc(user.uid).onSnapshot(doc => {
+          if (doc.metadata.hasPendingWrites) return; // ignora o eco do que acabei de salvar
+          if (doc.exists) {
+            state = { ...emptyState(), ...doc.data() };
+            try { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); } catch (e) {}
+            renderAll();
+            setStatus('Conectado ☁️');
+          } else {
+            persist(); // primeira vez: sobe o que já existe localmente
+          }
+        }, err => {
+          console.error(err);
+          setStatus('Sem conexão com a nuvem — Modo Local 💾');
+        });
+      });
+    }
+
+    // ---------- artigos ----------
+    function toPreviewUrl(url) {
+      const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+      return m ? `https://drive.google.com/file/d/${m[1]}/preview` : url;
+    }
+
+    function saveArticle(e) {
+      e.preventDefault();
+      state.articles.push({
+        title: document.getElementById('art-title').value,
+        authors: document.getElementById('art-authors').value,
+        summary: document.getElementById('art-summary').value,
+        link: document.getElementById('art-link').value.trim()
+      });
+      persist(); renderAll();
+      document.getElementById('form-article').reset();
+    }
+    function deleteArticle(i) {
+      if (!confirm('Excluir este artigo?')) return;
+      state.articles.splice(i, 1); persist(); renderAll();
+    }
+    function openPdf(i) {
+      const a = state.articles[i];
+      if (!a || !a.link) return;
+      document.getElementById('pdf-modal-title').innerText = a.title;
+      document.getElementById('pdf-frame').src = toPreviewUrl(a.link);
+      document.getElementById('pdf-open-tab').href = a.link;
+      document.getElementById('pdf-modal').style.display = 'flex';
+    }
+    function closePdfModal() {
+      document.getElementById('pdf-modal').style.display = 'none';
+      document.getElementById('pdf-frame').src = 'about:blank';
+    }
+
+    // ---------- citações ----------
+    function saveQuote(e) {
+      e.preventDefault();
+      state.quotes.push({
+        text: document.getElementById('quote-text').value,
+        ref: document.getElementById('quote-ref').value,
+        tags: document.getElementById('quote-tags').value
+      });
+      persist(); renderAll();
+      document.getElementById('form-quote').reset();
+    }
+    function deleteQuote(i) {
+      if (!confirm('Excluir esta citação?')) return;
+      state.quotes.splice(i, 1); persist(); renderAll();
+    }
+
+    // ---------- cronograma ----------
+    function saveTask(e) {
+      e.preventDefault();
+      state.tasks.push({
+        desc: document.getElementById('task-desc').value,
+        deadline: document.getElementById('task-deadline').value,
+        done: false
+      });
+      persist(); renderAll();
+      document.getElementById('form-task').reset();
+    }
+    function toggleTask(i) { state.tasks[i].done = !state.tasks[i].done; persist(); renderAll(); }
+    function deleteTask(i) {
+      if (!confirm('Excluir esta tarefa?')) return;
+      state.tasks.splice(i, 1); persist(); renderAll();
+    }
+
+    // ---------- redação ----------
+    function scheduleDraftSave() {
+      document.getElementById('draft-status').innerText = 'Digitando...';
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(saveDraft, 1200);
+    }
+    function saveDraft() {
+      state.draft = document.getElementById('writer-content').value;
+      persist();
+      document.getElementById('draft-status').innerText = 'Rascunho salvo.';
+    }
+
+    // ---------- sinônimos ----------
+    const academicDictionary = {
+      "analisar": ["examinar", "investigar", "decompor", "ponderar", "avaliar"],
+      "mostra": ["evidencia", "demonstra", "aponta", "revela", "indica"],
+      "importante": ["relevante", "fundamental", "crucial", "significativo", "pertinente"],
+      "conclui": ["depreende-se", "infere-se", "constata-se", "arremata-se"],
+      "porque": ["haja vista", "visto que", "posto que", "em virtude de"]
+    };
+    function searchSynonyms() {
+      const q = document.getElementById('synonym-search').value.toLowerCase().trim();
+      const out = document.getElementById('synonym-results');
+      out.innerHTML = '';
+      if (!q) return;
+      if (academicDictionary[q]) {
+        out.innerHTML = '<strong>Opções:</strong><br>' + academicDictionary[q].map(s =>
+          `<button type="button" class="btn btn-secondary btn-sm" style="margin:2px;" data-word="${esc(s)}">${esc(s)}</button>`
+        ).join(' ');
+        out.querySelectorAll('button').forEach(b => b.addEventListener('click', () => insertSynonym(b.dataset.word)));
+      } else {
+        out.innerHTML = '<span style="color:var(--text-muted)">Sem sugestões diretas. Tente: analisar, mostra, importante, conclui, porque.</span>';
+      }
+    }
+    function insertSynonym(word) {
+      const ta = document.getElementById('writer-content');
+      ta.value += ' ' + word;
+      scheduleDraftSave();
+    }
+
+    // ---------- renderização ----------
+    function renderAll() {
+      document.getElementById('articles-list').innerHTML = state.articles.map((a, i) => `
+        <div class="item-card">
+          <div>
+            <h3>${esc(a.title)}</h3>
+            <p><strong>${esc(a.authors)}</strong></p>
+            <p>${esc(a.summary)}</p>
+          </div>
+          <div class="actions">
+            ${a.link ? `<button class="btn btn-secondary btn-sm" onclick="openPdf(${i})">Ler PDF</button>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="deleteArticle(${i})">Excluir</button>
+          </div>
+        </div>`).join('');
+
+      document.getElementById('quotes-list').innerHTML = state.quotes.map((q, i) => `
+        <div class="item-card">
+          <div>
+            <p style="font-style:italic;">"${esc(q.text)}"</p>
+            <p><strong>- ${esc(q.ref)}</strong> ${q.tags ? '[' + esc(q.tags) + ']' : ''}</p>
+          </div>
+          <div class="actions"><button class="btn btn-danger btn-sm" onclick="deleteQuote(${i})">Excluir</button></div>
+        </div>`).join('');
+
+      document.getElementById('tasks-list').innerHTML = state.tasks.map((t, i) => `
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:1rem;">
+          <div>
+            <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask(${i})">
+            <span style="${t.done ? 'text-decoration:line-through;color:var(--text-muted);' : ''}margin-left:8px;">${esc(t.desc)} (${esc(t.deadline)})</span>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="deleteTask(${i})">Excluir</button>
+        </div>`).join('');
+
+      document.getElementById('total-articles-count').innerText = state.articles.length;
+      document.getElementById('total-quotes-count').innerText = state.quotes.length;
+      const completed = state.tasks.filter(t => t.done).length;
+      document.getElementById('completed-tasks-count').innerText = completed;
+      const pct = state.tasks.length ? Math.round(completed / state.tasks.length * 100) : 0;
+      document.getElementById('overall-progress').style.width = pct + '%';
+      document.getElementById('progress-percentage-text').innerText = pct + '% Concluído';
+
+      // não sobrescreve o editor enquanto você está digitando nele
+      const ta = document.getElementById('writer-content');
+      if (document.activeElement !== ta) ta.value = state.draft || '';
+    }
+
+    startAuth();
+  </script>
+</body>
+</html>
